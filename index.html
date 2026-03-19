@@ -26,7 +26,7 @@
 
 <div class="container py-5">
   <div class="no-print card p-4 mb-4 shadow-sm text-center">
-    <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v013</h3>
+    <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v014</h3>
     <p class="text-muted">Test.csv 파일을 선택하면 아래에 명단이 나타납니다.</p>
     <input type="file" id="csvFile" class="form-control" accept=".csv" />
   </div>
@@ -170,89 +170,91 @@
   }
 
   // ✅ PDF 생성 (한글 폰트 적용)
-  function downloadPDF() {
+function downloadPDF() {
     if (selectedIndex === null) {
       alert("리포트를 먼저 선택하세요.");
       return;
     }
-    // ✅ 여기서 직접 읽기 (중요!)
-    const fontBase64 = window.NotoSansKRBase64;
+
+    // 1. 외부 JS에서 로드된 폰트 데이터 확인
+    const fontData = window.NotoSansKRBase64;
     
-    // ✅ 폰트 로딩 체크 (안정성 강화)
-    if (!fontBase64) {
-      alert("폰트가 로드되지 않았습니다.");
+    if (!fontData) {
+      alert("오류: 폰트 데이터(window.NotoSansKRBase64)를 찾을 수 없습니다.\nJS 파일이 올바르게 로드되었는지 확인하세요.");
       return;
     }
 
-    const row = csvData[selectedIndex];
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    // 'p' (portrait), 'mm' (millimeter), 'a4' 사이즈 설정
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const row = csvData[selectedIndex];
 
-    // ✅ 폰트 등록 (최초 1회만)
-    if (!window.fontLoaded) {
-      doc.addFileToVFS("NotoSansKR-Regular.ttf", fontBase64);
-      doc.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
-      window.fontLoaded = true;
+    try {
+      // 2. 가상 파일 시스템에 폰트 추가 및 등록
+      const fontFileName = "NotoSansKR-Regular.ttf";
+      doc.addFileToVFS(fontFileName, fontData);
+      doc.addFont(fontFileName, "NotoSansKR", "normal");
+      
+      // 3. 폰트 적용 (이후의 모든 text와 autoTable에 적용됨)
+      doc.setFont("NotoSansKR");
+
+      // 제목 작성
+      doc.setFontSize(20);
+      doc.text("검사 결과 리포트", 105, 20, { align: "center" });
+
+      doc.setFontSize(10);
+      doc.text("본 문서는 시스템에서 자동 생성된 결과 보고서입니다.", 105, 28, { align: "center" });
+
+      // 4. 기본 정보 테이블
+      doc.autoTable({
+        startY: 40,
+        theme: 'grid',
+        styles: { font: "NotoSansKR", fontStyle: "normal" }, // 테이블 내 폰트 지정
+        headStyles: { fillColor: [52, 58, 64] },
+        head: [['수검 번호', '성명', '성별', '연령/교육', '검사 일시']],
+        body: [[
+          row.No,
+          row.Name,
+          row.Gender === 'M' ? '남성' : '여성',
+          `${row.Age}세 / ${row.Education}년`,
+          row.Date
+        ]],
+      });
+
+      // 5. 검사 상세 결과 테이블
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 10,
+        theme: 'grid',
+        styles: { font: "NotoSansKR" },
+        head: [['검사 세트', '소요 시간']],
+        body: [[row.TestSet, row.TimeTaken + ' 초']]
+      });
+
+      // 6. 점수 결과 테이블
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 10,
+        theme: 'grid',
+        styles: { font: "NotoSansKR" },
+        headStyles: { fillColor: [40, 167, 69] },
+        head: [['점수 A', '점수 B', '점수 C']],
+        body: [[row.A, row.B, row.C]]
+      });
+
+      // 7. 종합 소견
+      const finalY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(14);
+      doc.text("종합 소견", 14, finalY);
+      
+      doc.setFontSize(11);
+      doc.text(`위 데이터는 [검사기관: ${row.Center}]에서 측정된 결과입니다.`, 14, finalY + 10);
+
+      // 8. 파일 저장
+      doc.save(`Report_${row.Name}.pdf`);
+
+    } catch (error) {
+      console.error("PDF 생성 중 오류 발생:", error);
+      alert("PDF 생성 중 오류가 발생했습니다. 콘솔 창을 확인하세요.");
     }
-
-    // ✅ 폰트 적용
-    doc.setFont("NotoSansKR");
-
-    // 제목
-    doc.setFontSize(18);
-    doc.text("검사 결과 리포트", 105, 20, { align: "center" });
-
-    doc.setFontSize(12);
-    doc.text(
-      "본 문서는 시스템에서 자동 생성된 결과 보고서입니다.",
-      105,
-      30,
-      { align: "center" }
-    );
-
-    // 기본 정보
-    doc.autoTable({
-      styles: { font: "NotoSansKR" },
-      startY: 50,
-      head: [['수검 번호', '성명', '성별', '연령/교육', '검사 일시']],
-      body: [[
-        row.No,
-        row.Name,
-        row.Gender === 'M' ? '남성' : '여성',
-        `${row.Age}세 / ${row.Education}년`,
-        row.Date
-      ]]
-    });
-
-    // 검사 결과
-    doc.autoTable({
-      styles: { font: "NotoSansKR" },
-      startY: doc.lastAutoTable.finalY + 10,
-      head: [['검사 세트', '소요 시간']],
-      body: [[row.TestSet, row.TimeTaken + ' 초']]
-    });
-
-    // 점수
-    doc.autoTable({
-      styles: { font: "NotoSansKR" },
-      startY: doc.lastAutoTable.finalY + 10,
-      head: [['점수 A', '점수 B', '점수 C']],
-      body: [[row.A, row.B, row.C]]
-    });
-
-    // 종합 소견
-    doc.setFontSize(14);
-    doc.text("종합 소견", 20, doc.lastAutoTable.finalY + 20);
-
-    doc.setFontSize(12);
-    doc.text(
-      `위 데이터는 [검사기관: ${row.Center}]에서 측정된 결과입니다.`,
-      20,
-      doc.lastAutoTable.finalY + 30
-    );
-
-    // 저장
-    doc.save(`Report_${row.Name || 'User'}.pdf`);
   }
 </script>
 
