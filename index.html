@@ -24,7 +24,7 @@
 
 <div class="container py-5">
   <div class="no-print card p-4 mb-4 shadow-sm text-center">
-    <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v008</h3>
+    <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v009</h3>
     <p class="text-muted">Test.csv 파일을 선택하면 아래에 명단이 나타납니다.</p>
     <input type="file" id="csvFile" class="form-control" accept=".csv" />
   </div>
@@ -97,6 +97,7 @@
 <script>
   let csvData = [];
   let selectedIndex = null;
+  let defaultFont = "MalgunGothic"; // 기본 글꼴 정의 (Windows 기본 한글 폰트)
 
   // CSV 파싱
   document.getElementById('csvFile').addEventListener('change', function(e) {
@@ -153,7 +154,7 @@
     window.scrollTo({ top: document.getElementById('report-section').offsetTop - 20, behavior: 'smooth' });
   }
 
-  // PDF 생성 (autoTable + 한글 글꼴 적용)
+  // PDF 생성 (autoTable + 기본 글꼴 적용)
   function downloadPDF() {
     if (selectedIndex === null) {
       alert("리포트를 먼저 선택하세요.");
@@ -164,11 +165,8 @@
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // 한글 글꼴 추가 (NanumGothic 예시)
-    // 글꼴 파일을 VFS에 추가한 경우 아래 코드 사용
-    // doc.addFileToVFS("NanumGothic-Regular.ttf", NanumGothic);
-    // doc.addFont("NanumGothic-Regular.ttf", "NanumGothic", "normal");
-    doc.setFont("NanumGothic"); // 한글 지원 글꼴 지정
+    // 기본 글꼴 지정 (한 번만)
+    doc.setFont(defaultFont);
 
     // 제목
     doc.setFontSize(18);
@@ -178,7 +176,6 @@
     doc.text("본 문서는 시스템에서 자동 생성된 결과 보고서입니다.", 105, 30, { align: "center" });
 
     // 기본 정보 테이블
-    doc.setFont("NanumGothic");
     doc.autoTable({
       startY: 50,
       head: [['수검 번호', '성명', '성별', '연령/교육', '검사 일시']],
@@ -192,7 +189,6 @@
     });
 
     // 검사 상세 결과
-    doc.setFont("NanumGothic");
     doc.autoTable({
       startY: doc.lastAutoTable.finalY + 10,
       head: [['검사 세트', '소요 시간']],
@@ -200,7 +196,6 @@
     });
 
     // 점수
-    doc.setFont("NanumGothic");
     doc.autoTable({
       startY: doc.lastAutoTable.finalY + 10,
       head: [['점수 A', '점수 B', '점수 C']],
@@ -218,6 +213,7 @@
     doc.save(`Report_${row.Name || 'User'}.pdf`);
   }
 </script>
+
 
 
 </body>
