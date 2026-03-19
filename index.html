@@ -102,6 +102,7 @@
 
 <script>
     let csvData = [];
+    let selectedIndex = null;
 
     // 1. CSV 파싱 및 테이블 출력
     document.getElementById('csvFile').addEventListener('change', function(e) {
@@ -109,11 +110,12 @@
         Papa.parse(file, {
             header: true,
             complete: function(results) {
-                csvData = results.data.filter(row => row.No); // 데이터가 있는 행만 필터링
+                csvData = results.data.filter(row => row.No);
                 renderTable(csvData);
             }
         });
     });
+
 
     function renderTable(data) {
         let html = `
@@ -141,6 +143,7 @@
 
     // 2. 리포트에 데이터 주입
     function generateReport(index) {
+        selectedIndex = index;
         const row = csvData[index];
         document.getElementById('r-no').innerText = row.No;
         document.getElementById('r-name').innerText = row.Name;
@@ -148,7 +151,7 @@
         document.getElementById('r-age-edu').innerText = `${row.Age}세 / ${row.Education}년`;
         document.getElementById('r-date').innerText = row.Date;
         document.getElementById('r-testset').innerText = row.TestSet;
-        document.getElementById('r-time').innerText = row.TimeTaken.replace('T', '') + ' 초';
+        document.getElementById('r-time').innerText = row.TimeTaken + ' 초';
         document.getElementById('r-a').innerText = row.A;
         document.getElementById('r-b').innerText = row.B;
         document.getElementById('r-c').innerText = row.C;
@@ -160,31 +163,55 @@
 
 // 3. PDF 저장
 function downloadPDF() {
-    const element = document.getElementById('report-content');
-    const name = document.getElementById('r-name').innerText || 'User';
+    if (selectedIndex === null) {
+        alert("리포트를 먼저 선택하세요.");
+        return;
+    }
 
-    const opt = {
-        margin: [0.5, 0.5],
-        filename: `Report_${name}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2,
-            useCORS: true,
-            logging: false
-        },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
+    const row = csvData[selectedIndex];
+    const { jsPDF } = window.jspdf; // html2pdf.bundle에 포함됨
+    const doc = new jsPDF();
 
-    // report-section이 보이지 않으면 강제로 표시
-    const reportSection = document.getElementById('report-section');
-    reportSection.style.display = 'block';
+    // 제목
+    doc.setFontSize(18);
+    doc.text("검사 결과 리포트", 105, 20, { align: "center" });
 
-    // 브라우저 렌더링 완료 후 캡처
-    requestAnimationFrame(() => {
-        setTimeout(() => {
-            html2pdf().set(opt).from(element).save();
-        }, 800); // 0.8초 지연 → 렌더링 안정성 확보
-    });
+    doc.setFontSize(12);
+    doc.text("본 문서는 시스템에서 자동 생성된 결과 보고서입니다.", 105, 30, { align: "center" });
+
+    // 기본 정보
+    doc.setFontSize(14);
+    doc.text("1. 수검자 기본 정보", 20, 50);
+
+    doc.setFontSize(12);
+    doc.text(`수검 번호: ${row.No}`, 20, 60);
+    doc.text(`성명: ${row.Name}`, 20, 70);
+    doc.text(`성별: ${row.Gender === 'M' ? '남성' : '여성'}`, 20, 80);
+    doc.text(`연령/교육: ${row.Age}세 / ${row.Education}년`, 20, 90);
+    doc.text(`검사 일시: ${row.Date}`, 20, 100);
+
+    // 검사 상세 결과
+    doc.setFontSize(14);
+    doc.text("2. 검사 상세 결과", 20, 120);
+
+    doc.setFontSize(12);
+    doc.text(`검사 세트: ${row.TestSet}`, 20, 130);
+    doc.text(`소요 시간: ${row.TimeTaken} 초`, 20, 140);
+
+    // 점수
+    doc.text(`점수 A: ${row.A}`, 20, 160);
+    doc.text(`점수 B: ${row.B}`, 20, 170);
+    doc.text(`점수 C: ${row.C}`, 20, 180);
+
+    // 종합 소견
+    doc.setFontSize(14);
+    doc.text("3. 종합 소견", 20, 200);
+
+    doc.setFontSize(12);
+    doc.text(`위 데이터는 [검사기관: ${row.Center}]에서 측정된 결과입니다.`, 20, 210);
+
+    // 저장
+    doc.save(`Report_${row.Name || 'User'}.pdf`);
 }
 
 </script>
