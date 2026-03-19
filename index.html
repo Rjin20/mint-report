@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>검사 결과 리포트 생성기</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Pretendard', sans-serif; }
+        .container { max-width: 900px; }
+        #report-section { display: none; background: white; padding: 50px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 30px; }
+        .report-header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 30px; text-align: center; }
+        .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .info-table th, .info-table td { border: 1px solid #dee2e6; padding: 12px; text-align: center; }
+        .info-table th { background-color: #f1f3f5; width: 20%; }
+        .result-box { background: #e9ecef; padding: 20px; border-radius: 5px; margin-top: 20px; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    <div class="no-print card p-4 mb-4 shadow-sm text-center">
+        <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성</h3>
+        <p class="text-muted">Test.csv 파일을 선택하면 아래에 명단이 나타납니다.</p>
+        <input type="file" id="csvFile" class="form-control" accept=".csv" />
+    </div>
+
+    <div id="list-section" class="no-print mb-5">
+        <div id="table-container" class="table-responsive bg-white rounded shadow-sm"></div>
+    </div>
+
+    <div id="report-section">
+        <div id="report-content">
+            <div class="report-header">
+                <h1 class="display-6 fw-bold">검사 결과 리포트</h1>
+                <p class="text-secondary">본 문서는 시스템에서 자동 생성된 결과 보고서입니다.</p>
+            </div>
+
+            <h5 class="fw-bold mb-3 mt-4">1. 수검자 기본 정보</h5>
+            <table class="info-table">
+                <tr>
+                    <th>수검 번호</th><td id="r-no"></td>
+                    <th>성명</th><td id="r-name"></td>
+                </tr>
+                <tr>
+                    <th>성별</th><td id="r-gender"></td>
+                    <th>연령/교육</th><td id="r-age-edu"></td>
+                </tr>
+                <tr>
+                    <th>검사 일시</th><td colspan="3" id="r-date"></td>
+                </tr>
+            </table>
+
+            <h5 class="fw-bold mb-3 mt-4">2. 검사 상세 결과</h5>
+            <table class="info-table">
+                <tr>
+                    <th>검사 세트</th><td id="r-testset"></td>
+                    <th>소요 시간</th><td id="r-time"></td>
+                </tr>
+            </table>
+
+            <div class="row mt-4">
+                <div class="col-4">
+                    <div class="card text-center p-3">
+                        <small>점수 A</small><h2 id="r-a" class="fw-bold text-primary"></h2>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card text-center p-3">
+                        <small>점수 B</small><h2 id="r-b" class="fw-bold text-success"></h2>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card text-center p-3">
+                        <small>점수 C</small><h2 id="r-c" class="fw-bold text-danger"></h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="result-box mt-4">
+                <h6 class="fw-bold">종합 소견</h6>
+                <p id="r-summary" class="mb-0">위 데이터는 [검사기관: <span id="r-center"></span>]에서 측정된 결과입니다.</p>
+            </div>
+        </div>
+
+        <div class="text-center mt-5 no-print">
+            <button onclick="downloadPDF()" class="btn btn-dark btn-lg px-5">PDF 파일로 내보내기</button>
+            <button onclick="window.scrollTo(0,0)" class="btn btn-outline-secondary ms-2">목록으로</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let csvData = [];
+
+    // 1. CSV 파싱 및 테이블 출력
+    document.getElementById('csvFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        Papa.parse(file, {
+            header: true,
+            complete: function(results) {
+                csvData = results.data.filter(row => row.No); // 데이터가 있는 행만 필터링
+                renderTable(csvData);
+            }
+        });
+    });
+
+    function renderTable(data) {
+        let html = `
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>No</th><th>성명</th><th>검사일시</th><th>관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        data.forEach((row, index) => {
+            html += `
+                <tr>
+                    <td>${row.No}</td>
+                    <td><strong>${row.Name}</strong> (${row.Gender}/${row.Age}세)</td>
+                    <td>${row.Date}</td>
+                    <td><button class="btn btn-sm btn-primary" onclick="generateReport(${index})">리포트 보기</button></td>
+                </tr>
+            `;
+        });
+        html += `</tbody></table>`;
+        document.getElementById('table-container').innerHTML = html;
+    }
+
+    // 2. 리포트에 데이터 주입
+    function generateReport(index) {
+        const row = csvData[index];
+        document.getElementById('r-no').innerText = row.No;
+        document.getElementById('r-name').innerText = row.Name;
+        document.getElementById('r-gender').innerText = row.Gender === 'M' ? '남성' : '여성';
+        document.getElementById('r-age-edu').innerText = `${row.Age}세 / ${row.Education}년`;
+        document.getElementById('r-date').innerText = row.Date;
+        document.getElementById('r-testset').innerText = row.TestSet;
+        document.getElementById('r-time').innerText = row.TimeTaken.replace('T', '') + ' 초';
+        document.getElementById('r-a').innerText = row.A;
+        document.getElementById('r-b').innerText = row.B;
+        document.getElementById('r-c').innerText = row.C;
+        document.getElementById('r-center').innerText = row.Center;
+
+        document.getElementById('report-section').style.display = 'block';
+        window.scrollTo({ top: document.getElementById('report-section').offsetTop - 20, behavior: 'smooth' });
+    }
+
+    // 3. PDF 저장 (html2pdf 사용)
+    function downloadPDF() {
+        const element = document.getElementById('report-content');
+        const name = document.getElementById('r-name').innerText;
+        const opt = {
+            margin: 0.5,
+            filename: `Report_${name}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+</script>
+
+</body>
+</html>
