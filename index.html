@@ -25,7 +25,7 @@
 
 <div class="container py-5">
   <div class="no-print card p-4 mb-4 shadow-sm text-center">
-    <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v010</h3>
+    <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v011</h3>
     <p class="text-muted">Test.csv 파일을 선택하면 아래에 명단이 나타납니다.</p>
     <input type="file" id="csvFile" class="form-control" accept=".csv" />
   </div>
@@ -98,7 +98,9 @@
 <script>
   let csvData = [];
   let selectedIndex = null;
-  let defaultFont = "MalgunGothic"; // 기본 글꼴 정의 (Windows 기본 한글 폰트)
+
+  // ✅ 외부 JS에서 불러온 폰트
+  const fontBase64 = window.NotoSansKRBase64;
 
   // CSV 파싱
   document.getElementById('csvFile').addEventListener('change', function(e) {
@@ -122,16 +124,22 @@
         </thead>
         <tbody>
     `;
+
     data.forEach((row, index) => {
       html += `
         <tr>
           <td>${row.No}</td>
           <td><strong>${row.Name}</strong> (${row.Gender}/${row.Age}세)</td>
           <td>${row.Date}</td>
-          <td><button class="btn btn-sm btn-primary" onclick="generateReport(${index})">리포트 보기</button></td>
+          <td>
+            <button class="btn btn-sm btn-primary" onclick="generateReport(${index})">
+              리포트 보기
+            </button>
+          </td>
         </tr>
       `;
     });
+
     html += `</tbody></table>`;
     document.getElementById('table-container').innerHTML = html;
   }
@@ -139,6 +147,7 @@
   function generateReport(index) {
     selectedIndex = index;
     const row = csvData[index];
+
     document.getElementById('r-no').innerText = row.No;
     document.getElementById('r-name').innerText = row.Name;
     document.getElementById('r-gender').innerText = row.Gender === 'M' ? '남성' : '여성';
@@ -152,56 +161,96 @@
     document.getElementById('r-center').innerText = row.Center;
 
     document.getElementById('report-section').style.display = 'block';
-    window.scrollTo({ top: document.getElementById('report-section').offsetTop - 20, behavior: 'smooth' });
+
+    window.scrollTo({
+      top: document.getElementById('report-section').offsetTop - 20,
+      behavior: 'smooth'
+    });
   }
 
-  // PDF 생성 (autoTable + 기본 글꼴 적용)
-async function downloadPDF() {
-  if (selectedIndex === null) {
-    alert("리포트를 먼저 선택하세요.");
-    return;
+  // ✅ PDF 생성 (한글 폰트 적용)
+  function downloadPDF() {
+    if (selectedIndex === null) {
+      alert("리포트를 먼저 선택하세요.");
+      return;
+    }
+
+    // ✅ 폰트 로딩 체크 (안정성 강화)
+    if (!fontBase64) {
+      alert("폰트가 로드되지 않았습니다.");
+      return;
+    }
+
+    const row = csvData[selectedIndex];
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // ✅ 폰트 등록 (최초 1회만)
+    if (!window.fontLoaded) {
+      doc.addFileToVFS("NotoSansKR-Regular.ttf", fontBase64);
+      doc.addFont("NotoSansKR-Regular.ttf", "NotoSansKR", "normal");
+      window.fontLoaded = true;
+    }
+
+    // ✅ 폰트 적용
+    doc.setFont("NotoSansKR");
+
+    // 제목
+    doc.setFontSize(18);
+    doc.text("검사 결과 리포트", 105, 20, { align: "center" });
+
+    doc.setFontSize(12);
+    doc.text(
+      "본 문서는 시스템에서 자동 생성된 결과 보고서입니다.",
+      105,
+      30,
+      { align: "center" }
+    );
+
+    // 기본 정보
+    doc.autoTable({
+      styles: { font: "NotoSansKR" },
+      startY: 50,
+      head: [['수검 번호', '성명', '성별', '연령/교육', '검사 일시']],
+      body: [[
+        row.No,
+        row.Name,
+        row.Gender === 'M' ? '남성' : '여성',
+        `${row.Age}세 / ${row.Education}년`,
+        row.Date
+      ]]
+    });
+
+    // 검사 결과
+    doc.autoTable({
+      styles: { font: "NotoSansKR" },
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [['검사 세트', '소요 시간']],
+      body: [[row.TestSet, row.TimeTaken + ' 초']]
+    });
+
+    // 점수
+    doc.autoTable({
+      styles: { font: "NotoSansKR" },
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [['점수 A', '점수 B', '점수 C']],
+      body: [[row.A, row.B, row.C]]
+    });
+
+    // 종합 소견
+    doc.setFontSize(14);
+    doc.text("종합 소견", 20, doc.lastAutoTable.finalY + 20);
+
+    doc.setFontSize(12);
+    doc.text(
+      `위 데이터는 [검사기관: ${row.Center}]에서 측정된 결과입니다.`,
+      20,
+      doc.lastAutoTable.finalY + 30
+    );
+
+    // 저장
+    doc.save(`Report_${row.Name || 'User'}.pdf`);
   }
-
-  const element = document.getElementById("report-content");
-
-  // 👉 고해상도 캡처 (중요)
-  const canvas = await html2canvas(element, {
-    scale: 3,           // 해상도 ↑ (2~3 추천)
-    useCORS: true
-  });
-
-  const imgData = canvas.toDataURL("image/png");
-
-  const { jsPDF } = window.jspdf;
-
-  // A4 기준
-  const pdf = new jsPDF("p", "mm", "a4");
-
-  const pageWidth = 210;  // A4 width (mm)
-  const pageHeight = 297; // A4 height (mm)
-
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  // 첫 페이지
-  pdf.addImage(imgData, "PNG", 10, 10, imgWidth - 20, imgHeight);
-  heightLeft -= pageHeight;
-
-  // 👉 페이지가 길 경우 자동 분할
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
-
-  const row = csvData[selectedIndex];
-
-  pdf.save(`Report_${row.Name || 'User'}.pdf`);
-}
 </script>
 
 
