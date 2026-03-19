@@ -158,34 +158,32 @@
         window.scrollTo({ top: document.getElementById('report-section').offsetTop - 20, behavior: 'smooth' });
     }
 
-// 3. PDF 저장 (html2pdf사용: 최적화된 버전)
+// 3. PDF 저장
 function downloadPDF() {
     const element = document.getElementById('report-content');
     const name = document.getElementById('r-name').innerText || 'User';
 
-    // PDF 생성 옵션 설정
     const opt = {
-        margin: [0.5, 0.5], // 상하좌우 여백
+        margin: [0.5, 0.5],
         filename: `Report_${name}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
-            scale: 2, 
-            useCORS: true, // 외부 이미지나 폰트 허용
-            logging: false,
-            letterRendering: true
+            scale: 2,
+            useCORS: true,
+            logging: false
         },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
-    // [중요] 화면에 리포트가 확실히 표시된 후 캡처하도록 약간의 지연(delay)을 줌
-    // html2pdf().set(opt).from(element).save(); 대신 아래 방식을 사용하세요.
-    
-    const worker = html2pdf().set(opt).from(element);
-    
-    worker.toPdf().get('pdf').then(function (pdf) {
-        // PDF가 생성되기 직전에 추가적인 확인 로직이 필요하다면 여기에 작성
-    }).save();
+    // 1단계: 브라우저 렌더링 완료 시점 확보
+    requestAnimationFrame(() => {
+        // 2단계: 외부 폰트/이미지 로딩까지 고려해 약간의 지연 추가
+        setTimeout(() => {
+            html2pdf().set(opt).from(element).save();
+        }, 600); // 0.6초 지연 → 안정성 강화
+    });
 }
+
 </script>
 
 </body>
