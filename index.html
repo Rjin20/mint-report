@@ -30,7 +30,7 @@
 
 <div class="container py-5">
     <div class="no-print card p-4 mb-4 shadow-sm text-center">
-        <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v002</h3>
+        <h3 class="mb-3">📄 CSV 데이터 기반 리포트 생성 v003</h3>
         <p class="text-muted">Test.csv 파일을 선택하면 아래에 명단이 나타납니다.</p>
         <input type="file" id="csvFile" class="form-control" accept=".csv" />
     </div>
@@ -175,12 +175,15 @@ function downloadPDF() {
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
-    // 1단계: 브라우저 렌더링 완료 시점 확보
+    // report-section이 보이지 않으면 강제로 표시
+    const reportSection = document.getElementById('report-section');
+    reportSection.style.display = 'block';
+
+    // 브라우저 렌더링 완료 후 캡처
     requestAnimationFrame(() => {
-        // 2단계: 외부 폰트/이미지 로딩까지 고려해 약간의 지연 추가
         setTimeout(() => {
             html2pdf().set(opt).from(element).save();
-        }, 600); // 0.6초 지연 → 안정성 강화
+        }, 800); // 0.8초 지연 → 렌더링 안정성 확보
     });
 }
 
