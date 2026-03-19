@@ -17,6 +17,13 @@
         .info-table th { background-color: #f1f3f5; width: 20%; }
         .result-box { background: #e9ecef; padding: 20px; border-radius: 5px; margin-top: 20px; }
         @media print { .no-print { display: none !important; } }
+        /* PDF 출력 시 배경색과 텍스트가 잘 나오도록 강제 설정 */
+        @media print {
+            #report-content {
+            background: white !important;
+            color: black !important;
+            }
+        }
     </style>
 </head>
 <body>
